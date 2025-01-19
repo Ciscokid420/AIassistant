@@ -27,7 +27,7 @@ def setup_audio():
             channels=1,
             rate=16000,
             input=True,
-            frames_per_buffer=4096
+            frames_per_buffer=5000
         )
         stream.start_stream()
         print("Audio stream initialized")
