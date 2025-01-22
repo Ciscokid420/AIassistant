@@ -9,13 +9,25 @@ class TranscriptionHandler(FileSystemEventHandler):
     def __init__(self, llm_path):
         self.llm = Llama(
             model_path=llm_path,
-            n_ctx=2048,  # Adjust context window as needed
-            n_threads=4   # Adjust based on your CPU
+            n_ctx=2048,
+            n_batch=1024,
+            n_threads=8,
+            n_gpu_layers=-1,
+            main_gpu=0,
+            tensor_split=None,
+            seed=-1,
+            f16_kv=True,
+            use_mmap=True,
+            use_mlock=False,
+            vocab_only=False,
+            verbose=True,
+            offload_kqv=True
         )
+        
+        print("Llama model loaded with GPU acceleration")
         
     def process_transcription(self, transcription_path):
         try:
-            # Wait briefly to ensure file is fully written
             time.sleep(0.1)
             
             with open(transcription_path, 'r') as f:
@@ -24,25 +36,23 @@ class TranscriptionHandler(FileSystemEventHandler):
             if not user_input:
                 return
                 
-            print("\nProcessing transcription:", user_input)
-            
-            # Create a conversation prompt
             prompt = f"""USER: {user_input}
 ASSISTANT: """
             
-            # Generate response
             output = self.llm(
                 prompt,
-                max_tokens=500,
+                max_tokens=2000,
                 temperature=0.7,
-                stop=["USER:"],  # Stop at next user input
-                echo=False
+                top_p=0.95,
+                top_k=40,
+                stop=["USER:"],
+                echo=False,
+                stream=False,
             )
             
             response = output['choices'][0]['text'].strip()
-            print("\nLLM Response:", response)
+            print(response)  # Just print the raw response text
             
-            # Optionally save response to a file
             with open("/home/cisco/Documents/llama/responses/last_response.txt", "w") as f:
                 f.write(response)
                 
@@ -54,13 +64,10 @@ ASSISTANT: """
             self.process_transcription(event.src_path)
 
 def main():
-    # Path to your GGUF model file
-    llm_path = "/home/cisco/.lmstudio/models/LWDCLS/DarkIdol-Llama-3.1-8B-Instruct-1.2-Uncensored-GGUF-IQ-Imatrix-Request/DarkIdol-Llama-3.1-8B-Instruct-1.2-Uncensored-Q4_K_S-imat.gguf"  # Update this path
+    llm_path = "/home/cisco/Documents/llama/ChimeraLlama-3-8B.i1-Q4_0.gguf"
     
-    # Create response directory
     os.makedirs("/home/cisco/Documents/llama/responses/", exist_ok=True)
     
-    # Set up file monitoring
     handler = TranscriptionHandler(llm_path)
     observer = Observer()
     observer.schedule(
@@ -69,7 +76,7 @@ def main():
         recursive=False
     )
     
-    print("Starting LLM integration...")
+    print("Starting GPU-accelerated LLM integration...")
     print("Monitoring for transcriptions...")
     
     observer.start()
